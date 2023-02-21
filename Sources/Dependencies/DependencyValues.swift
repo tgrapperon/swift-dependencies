@@ -81,6 +81,7 @@ import Foundation
 /// Read the article <doc:RegisteringDependencies> for more information.
 public struct DependencyValues: Sendable {
   @TaskLocal public static var _current = Self()
+  @TaskLocal @_spi(Internals) public static var isOperating: Bool = false
   @TaskLocal static var isSetting = false
   @TaskLocal static var currentDependency = CurrentDependency()
 

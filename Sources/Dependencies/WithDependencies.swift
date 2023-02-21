@@ -27,13 +27,15 @@ public func withDependencies<R>(
   try DependencyValues.$isSetting.withValue(true) {
     var dependencies = DependencyValues._current
     try updateValuesForOperation(&dependencies)
-    return try DependencyValues.$_current.withValue(dependencies) {
-      try DependencyValues.$isSetting.withValue(false) {
-        let result = try operation()
-        if R.self is AnyClass {
-          dependencyObjects.store(result as AnyObject)
+    return try DependencyValues.$isOperating.withValue(true) {
+      try DependencyValues.$_current.withValue(dependencies) {
+        try DependencyValues.$isSetting.withValue(false) {
+          let result = try operation()
+          if R.self is AnyClass {
+            dependencyObjects.store(result as AnyObject)
+          }
+          return result
         }
-        return result
       }
     }
   }
