@@ -2,15 +2,24 @@ import Foundation
 
 #if DEBUG
   struct DebugDependency {
+    struct CandidatePointOfEntry: Hashable {
+      let id: ObjectIdentifier
+      let typeName: String
+    }
+
     enum Mode: Sendable {
       case verbose
       case compact
     }
-    var path: [String] = []
-    var iterationPerLevel: [Int: Int] = [:]
+
+    let debugMode = LockIsolated(Mode?.some(.verbose))
+    //    let debugMode = LockIsolated(Mode?.none)
+
+    let isMultiplePointsOfEntryDetectionEnabled = LockIsolated(true)
     let maxLineLength: Int = 80
-//    let debugMode = LockIsolated(Mode?.none)
-     let debugMode = LockIsolated(Mode?.some(.verbose))
+    let pointsOfEntry = LockIsolated([CandidatePointOfEntry]())
+    var iterationPerLevel: [Int: Int] = [:]
+    var path: [String] = []
 
     mutating func overrideDependencies(
       function: StaticString,
@@ -168,6 +177,32 @@ import Foundation
         print(message.joined(separator: "\n"))
       }
     }
+
+    func registerPotentialPointOfEntry<Object: AnyObject>(_ object: Object) {
+      guard self.isMultiplePointsOfEntryDetectionEnabled.value else { return }
+      if self.pointsOfEntry.isEmpty {
+        self.pointsOfEntry.withValue {
+          $0.append(.init(id: ObjectIdentifier(object), typeName: typeName(type(of: object))))
+        }
+      } else {
+        guard self.path.isEmpty else { return }
+        let objectId = ObjectIdentifier(object)
+        let conflicting = self.pointsOfEntry.value.filter({ $0.id != objectId })
+        if !conflicting.isEmpty {
+          let typeName = typeName(type(of: object))
+          runtimeWarn(
+            """
+            Warning - Multiple points of entries detected.…
+
+            A \(typeName) model was apparently created without inheriting the dependencies from \
+            a parent model.
+
+            TODO: Provide an explanation.
+            """
+          )
+        }
+      }
+    }
   }
 
   extension DebugDependency: DependencyKey {
@@ -177,21 +212,40 @@ import Foundation
 #endif
 
 extension DependencyValues {
-  #if DEBUG
-    public static func printDependenciesPath() {
+
+  public static func printDependenciesPath() {
+    #if DEBUG
       if _current.debug.path.isEmpty {
         print("Dependencies path: / (Default Dependencies)")
       } else {
         print("Dependencies path: \(_current.debug.path.joined(separator: "/"))")
       }
-    }
+    #endif
+  }
+  
+  public static func enableMultiplePointsOfEntryDetection(_ isEnabled: Bool) {
+    #if DEBUG
+    let pointsOfEntry = _current.debug.pointsOfEntry
+      _current.debug.isMultiplePointsOfEntryDetectionEnabled.withValue {
+        $0 = isEnabled
+        if !isEnabled {
+          pointsOfEntry.withValue {
+            $0 = []
+          }
+        }
+      }
+    #endif
+  }
 
-    public static func enableDebug(verbose: Bool = true) {
+  public static func enableDebug(verbose: Bool = true) {
+    #if DEBUG
       _current.debug.debugMode.withValue {
         $0 = verbose ? .verbose : .compact
       }
-    }
+    #endif
+  }
 
+  #if DEBUG
     var debug: DebugDependency {
       get { self[DebugDependency.self] }
       set { self[DebugDependency.self] = newValue }

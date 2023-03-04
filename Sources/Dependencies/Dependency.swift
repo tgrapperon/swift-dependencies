@@ -98,6 +98,30 @@ public struct Dependency<Value>: @unchecked Sendable, _HasInitialValues {
       return self.initialValues.merging(DependencyValues._current)[keyPath: self.keyPath]
     #endif
   }
+
+  public static subscript<InstanceType: AnyObject>(
+    _enclosingInstance instance: InstanceType,
+    wrapped wrappedKeyPath: KeyPath<InstanceType, Value>,
+    storage storageKeyPath: KeyPath<InstanceType, Self>
+  ) -> Value {
+    get {
+      let `self` = instance[keyPath: storageKeyPath]
+      #if DEBUG
+//        if DependencyValues._current.context == .live {
+          DependencyValues._current.debug.registerPotentialPointOfEntry(instance)
+//        }
+        var currentDependency = DependencyValues.currentDependency
+        currentDependency.file = self.file
+        currentDependency.fileID = self.fileID
+        currentDependency.line = self.line
+        return DependencyValues.$currentDependency.withValue(currentDependency) {
+          self.initialValues.merging(DependencyValues._current)[keyPath: self.keyPath]
+        }
+      #else
+        return self.initialValues.merging(DependencyValues._current)[keyPath: self.keyPath]
+      #endif
+    }
+  }
 }
 
 protocol _HasInitialValues {

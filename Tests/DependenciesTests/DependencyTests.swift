@@ -8,6 +8,12 @@ final class DependencyTests: XCTestCase {
     XCTAssertEqual(int, 42)
     XCTAssertEqual(42, Model().int)
     XCTAssertEqual("goodbye", Model().string)
+    
+    // Resets points of entry's internal state.
+    // The `Model()` above registered itself, so the upcoming instance
+    // will be seen as "duplicate" in a single point of entry pov.
+    // TODO: Find something better.
+    DependencyValues.enableMultiplePointsOfEntryDetection(false)
 
     let model = withDependencies {
       $0.int = 1729
@@ -94,7 +100,9 @@ final class DependencyTests: XCTestCase {
     XCTAssertEqual(int, 42)
     XCTAssertEqual(42, Model().int)
     XCTAssertEqual("goodbye", Model().string)
-
+    
+    DependencyValues.enableMultiplePointsOfEntryDetection(false)
+    
     let model = await withDependencies {
       await Task.yield()
       $0.int = 1729
