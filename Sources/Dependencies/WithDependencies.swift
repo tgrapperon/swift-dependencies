@@ -22,13 +22,26 @@ import Foundation
 @discardableResult
 public func withDependencies<R>(
   _ updateValuesForOperation: (inout DependencyValues) throws -> Void,
-  operation: () throws -> R
+  operation: () throws -> R,
+  function: StaticString = #function,
+  fileID: StaticString = #fileID,
+  line: UInt = #line
 ) rethrows -> R {
   try DependencyValues.$isSetting.withValue(true) {
     var dependencies = DependencyValues._current
     try updateValuesForOperation(&dependencies)
+    #if DEBUG
+      let hash = dependencies.debug.overrideDependencies(
+        function: function,
+        fileID: fileID,
+        line: line
+      )
+    #endif
     return try DependencyValues.$_current.withValue(dependencies) {
-      try DependencyValues.$isSetting.withValue(false) {
+      #if DEBUG
+        defer { dependencies.debug.finishOverridingDependencies(hash: hash) }
+      #endif
+      return try DependencyValues.$isSetting.withValue(false) {
         let result = try operation()
         if R.self is AnyClass {
           dependencyObjects.store(result as AnyObject)
@@ -63,13 +76,26 @@ public func withDependencies<R>(
   @discardableResult
   public func withDependencies<R>(
     _ updateValuesForOperation: (inout DependencyValues) async throws -> Void,
-    operation: () async throws -> R
+    operation: () async throws -> R,
+    function: StaticString = #function,
+    fileID: StaticString = #fileID,
+    line: UInt = #line
   ) async rethrows -> R {
     try await DependencyValues.$isSetting.withValue(true) {
       var dependencies = DependencyValues._current
       try await updateValuesForOperation(&dependencies)
+      #if DEBUG
+        let hash = dependencies.debug.overrideDependencies(
+          function: function,
+          fileID: fileID,
+          line: line
+        )
+      #endif
       return try await DependencyValues.$_current.withValue(dependencies) {
-        try await DependencyValues.$isSetting.withValue(false) {
+        #if DEBUG
+          defer { dependencies.debug.finishOverridingDependencies(hash: hash) }
+        #endif
+        return try await DependencyValues.$isSetting.withValue(false) {
           let result = try await operation()
           if R.self is AnyClass {
             dependencyObjects.store(result as AnyObject)
@@ -342,9 +368,12 @@ public func withDependencies<Model: AnyObject, R>(
 /// - Parameter operation: A closure that takes a ``DependencyValues/Continuation`` value for
 ///   propagating dependencies past an escaping closure boundary.
 public func withEscapedDependencies<R>(
-  _ operation: (DependencyValues.Continuation) throws -> R
+  _ operation: (DependencyValues.Continuation) throws -> R,
+  function: StaticString = #function,
+  fileID: StaticString = #fileID,
+  line: UInt = #line
 ) rethrows -> R {
-  try operation(DependencyValues.Continuation())
+  try operation(DependencyValues.Continuation(function: function, fileID: fileID, line: line))
 }
 
 /// Propagates the current dependencies to an escaping context.
@@ -354,9 +383,12 @@ public func withEscapedDependencies<R>(
 /// - Parameter operation: A closure that takes a ``DependencyValues/Continuation`` value for
 ///   propagating dependencies past an escaping closure boundary.
 public func withEscapedDependencies<R>(
-  _ operation: (DependencyValues.Continuation) async throws -> R
+  _ operation: (DependencyValues.Continuation) async throws -> R,
+  function: StaticString = #function,
+  fileID: StaticString = #fileID,
+  line: UInt = #line
 ) async rethrows -> R {
-  try await operation(DependencyValues.Continuation())
+  try await operation(DependencyValues.Continuation(function: function, fileID: fileID, line: line))
 }
 
 extension DependencyValues {
@@ -365,18 +397,54 @@ extension DependencyValues {
   /// See the docs of ``withEscapedDependencies(_:)-5xvi3`` for more information.
   public struct Continuation: Sendable {
     let dependencies = DependencyValues._current
-
+    #if DEBUG
+      let escapedHash: String?
+    #endif
+    init(
+      function: StaticString = #function,
+      fileID: StaticString = #fileID,
+      line: UInt = #line
+    ) {
+      #if DEBUG
+        self.escapedHash = dependencies.debug.escapeDependencies(
+          function: function,
+          fileID: fileID,
+          line: line
+        )
+      #endif
+    }
     /// Access the propagated dependencies in an escaping context.
     ///
     /// See the docs of ``withEscapedDependencies(_:)-5xvi3`` for more information.
     /// - Parameter operation: A closure which will have access to the propagated dependencies.
-    public func yield<R>(_ operation: () throws -> R) rethrows -> R {
+    public func yield<R>(
+      _ operation: () throws -> R,
+      function: StaticString = #function,
+      fileID: StaticString = #fileID,
+      line: UInt = #line
+    ) rethrows -> R {
       // TODO: Should `yield` be renamed to `restore`?
-      try withDependencies {
-        $0 = self.dependencies
-      } operation: {
-        try operation()
-      }
+      #if DEBUG
+        try DependencyValues.$isEscapedDependencies.withValue(true) {
+          try withDependencies {
+            $0 = self.dependencies
+          } operation: {
+            try DependencyValues.$isEscapedDependencies.withValue(false) {
+              self.dependencies.debug.yieldEscapedDependencies(hash: self.escapedHash)
+              defer {
+                dependencies.debug.finishYieldingDependencies(hash: self.escapedHash)
+              }
+              return try operation()
+            }
+          }
+        }
+      #else
+        try withDependencies {
+          $0 = self.dependencies
+        } operation: {
+          return try operation()
+        }
+      #endif
     }
 
     /// Access the propagated dependencies in an escaping context.

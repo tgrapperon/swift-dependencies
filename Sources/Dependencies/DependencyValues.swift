@@ -83,6 +83,7 @@ public struct DependencyValues: Sendable {
   @TaskLocal public static var _current = Self()
   @TaskLocal static var isSetting = false
   @TaskLocal static var currentDependency = CurrentDependency()
+  @TaskLocal static var isEscapedDependencies = false
 
   fileprivate var cachedValues = CachedValues()
   private var storage: [ObjectIdentifier: AnySendable] = [:]
