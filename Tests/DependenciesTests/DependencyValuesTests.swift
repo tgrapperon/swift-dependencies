@@ -591,35 +591,37 @@ final class DependencyValuesTests: XCTestCase {
       XCTAssertEqual(value, 1)
     }
   #endif
-  
+
   #if DEBUG && !os(Linux)
-  func testDetectDuplicatePointOfEntry() {
-    final class Parent {
-      @Dependency(\.self) var dependencies
-      
-      func makeChild() -> Child {
-        withDependencies(from: self) {
+    func testDetectDuplicatePointOfEntry() {
+      final class Parent {
+        @Dependency(\.self) var dependencies
+
+        func makeChild() -> Child {
+          withDependencies(from: self) {
+            Child()
+          }
+        }
+
+        func makeDuplicate() -> Child {
           Child()
         }
       }
       
-      func makeDuplicate() -> Child {
-        Child()
+      final class Child {
+        @Dependency(\.fullDependency) var fullDependency
+      }
+      
+      let parent = Parent()
+
+      let child = parent.makeChild()
+      XCTAssertEqual(child.fullDependency.value, 3)
+
+      let duplicate = parent.makeDuplicate()
+      XCTExpectFailure {
+        XCTAssertEqual(duplicate.fullDependency.value, 3)
       }
     }
-    final class Child {
-      @Dependency(\.fullDependency) var fullDependency
-    }
-    let parent = Parent()
-    
-    let child = parent.makeChild()
-    XCTAssertEqual(child.fullDependency.value, 3)
-    
-    let duplicate = parent.makeDuplicate()
-    XCTExpectFailure {
-      XCTAssertEqual(duplicate.fullDependency.value, 3)
-    }
-  }
   #endif
 }
 
