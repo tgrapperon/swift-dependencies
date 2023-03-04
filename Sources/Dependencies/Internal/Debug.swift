@@ -9,8 +9,8 @@ import Foundation
     var path: [String] = []
     var iterationPerLevel: [Int: Int] = [:]
     let maxLineLength: Int = 80
-    let debugMode = LockIsolated(Mode?.none)
-    // let debugMode = LockIsolated(Mode?.some(.verbose))
+//    let debugMode = LockIsolated(Mode?.none)
+     let debugMode = LockIsolated(Mode?.some(.verbose))
 
     mutating func overrideDependencies(
       function: StaticString,
