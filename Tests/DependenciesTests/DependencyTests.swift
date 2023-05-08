@@ -126,7 +126,6 @@ final class DependencyTests: XCTestCase {
       await Task.yield()
       $0.int = 0
       $0.string = "cya"
-      $0.debug = .print()
     } operation: {
       await Task.yield()
       XCTAssertEqual(0, child.int)
@@ -142,11 +141,6 @@ final class DependencyTests: XCTestCase {
       await Task.yield()
       $0.int = 0
       $0.string = "cya"
-      $0.debug = DebugDependency {
-        if $0 == \.int {
-          print("Int was accessed!")
-        }
-      }
     } operation: {
       await Task.yield()
       XCTAssertEqual(0, grandchild.int)
@@ -175,6 +169,36 @@ final class DependencyTests: XCTestCase {
     }
     XCTAssertEqual(9000, greatGrandchild.int)
     XCTAssertEqual("cool", greatGrandchild.string)
+  }
+  
+  func testDebugPrint() {
+    @Dependency(\.int) var int: Int
+    @Dependency(\.string) var string: String
+
+    withDependencies {
+      $0.int = 0
+      $0.string = "cya"
+      $0.debug = .print()
+    } operation: {
+      let i = int
+      let s = string
+    }
+  }
+  func testDebugBlock() {
+    @Dependency(\.int) var int: Int
+    @Dependency(\.string) var string: String
+    
+    withDependencies {
+      $0.int = 0
+      $0.string = "cya"
+      $0.debug = DebugDependency {
+        if $0 == \.int {
+          print("Int was accessed!")
+        }
+      }
+    } operation: {
+      let i = int
+    }
   }
 }
 private class Model {
