@@ -27,7 +27,6 @@ extension DebugDependency: DependencyKey {
   public static func print() -> DebugDependency {
     DebugDependency {
       keyPath in
-      // TODO: Replace with better KeyPath description
       Swift.print("Did access: \(String(describing: keyPath))")
     }
   }
