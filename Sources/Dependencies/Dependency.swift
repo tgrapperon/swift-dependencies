@@ -94,7 +94,8 @@ public struct Dependency<Value>: @unchecked Sendable, _HasInitialValues {
       return DependencyValues.$currentDependency.withValue(currentDependency) {
         let dependencies = self.initialValues.merging(DependencyValues._current)
         return DependencyValues.$_current.withValue(dependencies) {
-          DependencyValues._current[keyPath: self.keyPath]
+          DependencyValues._current.debug.dependency(keyPath)
+          return DependencyValues._current[keyPath: self.keyPath]
         }
       }
     #else
